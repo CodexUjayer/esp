@@ -1,39 +1,108 @@
+local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 
--- Function to add highlight to a player's character
-local function addHighlight(character)
-    if character then
-        -- Check if highlight already exists to avoid duplicates
-        if not character:FindFirstChild("Highlight") then
-            local highlight = Instance.new("Highlight")
-            highlight.Name = "Highlight"
-            highlight.FillColor = Color3.fromRGB(255, 255, 0) -- Yellow fill
-            highlight.OutlineColor = Color3.fromRGB(255, 0, 0) -- Red outline
-            highlight.FillTransparency = 0.5
-            highlight.OutlineTransparency = 0
-            highlight.Adornee = character
-            highlight.Parent = character
-        end
-    end
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+local flying = false
+local speed = 50
+local maxSpeed = 100
+local bodyVelocity = nil
+local bodyGyro = nil
+
+local function startFlying()
+	if flying then return end
+	flying = true
+	humanoid.PlatformStand = true
+	
+	-- Create BodyVelocity for movement
+	bodyVelocity = Instance.new("BodyVelocity")
+	bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+	bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+	bodyVelocity.Parent = rootPart
+	
+	-- Create BodyGyro for orientation
+	bodyGyro = Instance.new("BodyGyro")
+	bodyGyro.MaxTorque = Vector3.new(400000, 400000, 400000)
+	bodyGyro.P = 3000
+	bodyGyro.D = 500
+	bodyGyro.Parent = rootPart
 end
 
--- Function to handle player character added
-local function onPlayerAdded(player)
-    -- Connect to character added event
-    player.CharacterAdded:Connect(function(character)
-        addHighlight(character)
-    end)
-    
-    -- Check if player already has a character
-    if player.Character then
-        addHighlight(player.Character)
-    end
+local function stopFlying()
+	if not flying then return end
+	flying = false
+	humanoid.PlatformStand = false
+	
+	if bodyVelocity then
+		bodyVelocity:Destroy()
+		bodyVelocity = nil
+	end
+	if bodyGyro then
+		bodyGyro:Destroy()
+		bodyGyro = nil
+	end
 end
 
--- Connect to Players service for new players
-Players.PlayerAdded:Connect(onPlayerAdded)
-
--- Highlight all existing players
-for _, player in pairs(Players:GetPlayers()) do
-    onPlayerAdded(player)
+local function updateFlight()
+	if not flying then return end
+	local camera = workspace.CurrentCamera
+	local moveDirection = Vector3.new(0, 0, 0)
+	
+	-- Get input for movement
+	if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+		moveDirection = moveDirection + camera.CFrame.LookVector
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+		moveDirection = moveDirection - camera.CFrame.LookVector
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+		moveDirection = moveDirection - camera.CFrame.RightVector
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+		moveDirection = moveDirection + camera.CFrame.RightVector
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+		moveDirection = moveDirection + Vector3.new(0, 1, 0)
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+		moveDirection = moveDirection - Vector3.new(0, 1, 0)
+	end
+	
+	-- Apply movement
+	if moveDirection.Magnitude > 0 then
+		bodyVelocity.Velocity = moveDirection.Unit * speed
+	else
+		bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+	end
+	
+	-- Orient character to camera direction
+	bodyGyro.CFrame = camera.CFrame
 end
+
+-- Toggle flying with 'F' key
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.F then
+		if flying then
+			stopFlying()
+		else
+			startFlying()
+		end
+	end
+end)
+
+-- Update flight every frame
+game:GetService("RunService").RenderStepped:Connect(updateFlight)
+
+-- Handle character respawn
+player.CharacterAdded:Connect(function(newCharacter)
+	character = newCharacter
+	humanoid = character:WaitForChild("Humanoid")
+	rootPart = character:WaitForChild("HumanoidRootPart")
+	if flying then
+		startFlying()
+	end
+end)
