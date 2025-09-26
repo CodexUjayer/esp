@@ -1,0 +1,39 @@
+local Players = game:GetService("Players")
+
+-- Function to add highlight to a player's character
+local function addHighlight(character)
+    if character then
+        -- Check if highlight already exists to avoid duplicates
+        if not character:FindFirstChild("Highlight") then
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "Highlight"
+            highlight.FillColor = Color3.fromRGB(255, 255, 0) -- Yellow fill
+            highlight.OutlineColor = Color3.fromRGB(255, 0, 0) -- Red outline
+            highlight.FillTransparency = 0.5
+            highlight.OutlineTransparency = 0
+            highlight.Adornee = character
+            highlight.Parent = character
+        end
+    end
+end
+
+-- Function to handle player character added
+local function onPlayerAdded(player)
+    -- Connect to character added event
+    player.CharacterAdded:Connect(function(character)
+        addHighlight(character)
+    end)
+    
+    -- Check if player already has a character
+    if player.Character then
+        addHighlight(player.Character)
+    end
+end
+
+-- Connect to Players service for new players
+Players.PlayerAdded:Connect(onPlayerAdded)
+
+-- Highlight all existing players
+for _, player in pairs(Players:GetPlayers()) do
+    onPlayerAdded(player)
+end
